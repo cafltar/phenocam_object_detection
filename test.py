@@ -1,4 +1,3 @@
-import os
 import sys
 import torch
 from PIL import Image
@@ -7,7 +6,6 @@ from torchvision.transforms import functional as F
 import requests
 from io import BytesIO
 import json
-import time
 import datetime
 from torchvision import transforms
 from torchvision.models.detection import FasterRCNN_ResNet50_FPN_Weights
@@ -21,30 +19,12 @@ groups = {
     "vehicles": ["car", "truck", "motorcycle", "bicycle", "bus", "train", "boat", "bike"],
     "animals": ["dog", "cat", "bird", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe"],
     "person": ["person"],
-    
 }
-
-# Category names
-#COCO_INSTANCE_CATEGORY_NAMES = [
-#    '__background__', 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
-#    'train', 'truck', 'boat', 'traffic light', 'fire hydrant', 'N/A', 'stop sign',
-#    'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
-#    'elephant', 'bear', 'zebra', 'giraffe', 'N/A', 'backpack', 'umbrella', 'N/A',
-#    'N/A', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball',
-#    'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
-#    'bottle', 'N/A', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
-#    'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza',
-#    'donut', 'cake', 'chair', 'couch', 'potted plant', 'bed', 'N/A', 'dining table',
-#    'N/A', 'N/A', 'toilet', 'N/A', 'tv', 'laptop', 'mouse', 'remote', 'keyboard',
-#    'cell phone', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'N/A', 'book',
-#    'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush'
-#]
 
 # Function to preprocess image
 def preprocess(image):
     preprocess = weights.transforms()
-    return preprocess(image).unsqueeze(0)  # Add batch dimension
-    #return F.to_tensor(image).unsqueeze(0)
+    return preprocess(image).unsqueeze(0)
 
 # Function to postprocess results
 def postprocess(output, threshold=0.3):
@@ -54,6 +34,7 @@ def postprocess(output, threshold=0.3):
     
     detected_objects = []
     other_objects = []
+
     current_time = datetime.datetime.now().isoformat()
 
     for box, label, score in zip(boxes, labels, scores):
