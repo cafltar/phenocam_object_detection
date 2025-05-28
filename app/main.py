@@ -1,112 +1,47 @@
+import os
 import sys
-import torch
-from PIL import Image
-from torchvision.models.detection import fasterrcnn_resnet50_fpn
-from torchvision.transforms import functional as F
-import requests
-from io import BytesIO
 import json
-import datetime
-from torchvision import transforms
-from torchvision.models.detection import FasterRCNN_ResNet50_FPN_Weights
+import logging
+from services.file_loader import FileLoader
+from services.object_detector import ObjectDetector
 
-# Define model
-weights = FasterRCNN_ResNet50_FPN_Weights.DEFAULT
-model = fasterrcnn_resnet50_fpn(weights=weights)
-model.eval()  # Set the model to evaluation mode
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
+logger = logging.getLogger(__name__)
 
-groups = {
-    "vehicles": ["car", "truck", "motorcycle", "bicycle", "bus", "train", "boat", "bike"],
-    "animals": ["dog", "cat", "bird", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe"],
-    "person": ["person"],
-}
+def load_config(config_path='config.json'):
+    if os.path.exists(config_path):
+        with open(config_path, 'r') as f:
+            return json.load(f)
+    return {}
 
-# Function to preprocess image
-def preprocess(image):
-    preprocess = weights.transforms()
-    return preprocess(image).unsqueeze(0)
-
-# Function to postprocess results
-def postprocess(output, threshold=0.3):
-    boxes = output[0]['boxes']
-    labels = output[0]['labels']
-    scores = output[0]['scores']
-    
-    detected_objects = []
-    other_objects = []
-
-    current_time = datetime.datetime.now().isoformat()
-
-    for box, label, score in zip(boxes, labels, scores):
-        if score >= threshold:
-            label_name = weights.meta["categories"][label.item()]
-            is_hit = False
-            for group_name, group_items in groups.items():
-                
-                if label_name in group_items:  # Check if the label belongs to any group
-                    detected_objects.append({
-                        "box": box.tolist(),
-                        "timestamp": current_time,
-                        "label": label_name,
-                        "score": score.item()
-                    })
-                    is_hit = True
-            if not is_hit:
-                    other_objects.append({
-                        "box": box.tolist(),
-                        "timestamp": current_time,
-                        "label": label_name,
-                        "score": score.item()
-                    })
-                   
-    return detected_objects, other_objects
-
-# Main function
-def main(url, score_threshold):
+def main(url, score_threshold=None):
+    config = load_config()
+    if score_threshold is None:
+        score_threshold = config.get('score_threshold', 0.5)
     try:
-        # Load the image from the URL
-        print('Loading: ' + url)
-        response = requests.get(url)
-        img = Image.open(BytesIO(response.content)).convert("RGB")
-
-        # Preprocess the image
-        print('Preprocessing the image...')
-        input_tensor = preprocess(img)
-
-        # Run the model
-        print('Running the model...')
-        with torch.no_grad():
-            outputs = model(input_tensor)
-
-        # Postprocess the outputs
-        print('Postprocessing results...')
-        detections, others = postprocess(outputs, score_threshold)
-
-        # Convert detections to JSON
-        print('Converting to json...')
+        logger.info(f'Loading: {url}')
+        loader = FileLoader(url)
+        img = loader.load_image()
+        logger.info('Preprocessing and running detection...')
+        detector = ObjectDetector(score_threshold)
+        detections, others = detector.detect(img)
+        logger.info('Converting to json...')
         detections_json = json.dumps(detections, indent=4)
         others_json = json.dumps(others, indent=4)
-
-        # Print the JSON output
         print(detections_json)
         print(others_json)
-    
     except Exception as e:
-        print(f"Error: {e}")
-
-    # Wait for 15 minutes before running again
+        logger.error(f"Error: {e}", exc_info=True)
     #time.sleep(900)  # 900 seconds = 15 minutes
 
 if __name__ == "__main__":
-    print('Running v0.1.2')
-
+    logger.info('Running v0.1.2')
     if len(sys.argv) < 2:
-        print("Usage: python main.py image_url [score_threshold]")
+        logger.error("Usage: python main.py image_url [score_threshold]")
         sys.exit(1)
-    
     image_url = sys.argv[1]
-    score_threshold = 0.3
+    score_threshold = None
     if len(sys.argv) == 3:
         score_threshold = float(sys.argv[2])
-
     main(image_url, score_threshold)

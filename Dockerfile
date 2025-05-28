@@ -7,7 +7,11 @@ WORKDIR /app
 COPY . /app
 
 # Install any needed packages 
-RUN pip install --no-cache-dir torch torchvision pillow requests
+RUN pip install --no-cache-dir -r app/requirements.txt
+
+# Use a non-root user for security
+RUN useradd -m appuser && chown -R appuser /app
+USER appuser
 
 # Make port 80 available to the world outside this container
 EXPOSE 80
