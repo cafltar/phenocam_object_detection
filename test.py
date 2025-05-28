@@ -9,37 +9,42 @@ from io import BytesIO
 import json
 import time
 import datetime
+from torchvision import transforms
+from torchvision.models.detection import FasterRCNN_ResNet50_FPN_Weights
 
 # Define model
-model = fasterrcnn_resnet50_fpn(pretrained=True)
+weights = FasterRCNN_ResNet50_FPN_Weights.DEFAULT
+model = fasterrcnn_resnet50_fpn(weights=weights)
 model.eval()  # Set the model to evaluation mode
 
 groups = {
     "vehicles": ["car", "truck", "motorcycle", "bicycle", "bus", "train", "boat", "bike"],
-    "animals": ["dog", "cat", "bird", "horse", "sheep", "cow"],
+    "animals": ["dog", "cat", "bird", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe"],
     "person": ["person"],
     
 }
 
 # Category names
-COCO_INSTANCE_CATEGORY_NAMES = [
-    '__background__', 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
-    'train', 'truck', 'boat', 'traffic light', 'fire hydrant', 'N/A', 'stop sign',
-    'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
-    'elephant', 'bear', 'zebra', 'giraffe', 'N/A', 'backpack', 'umbrella', 'N/A',
-    'N/A', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball',
-    'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
-    'bottle', 'N/A', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
-    'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza',
-    'donut', 'cake', 'chair', 'couch', 'potted plant', 'bed', 'N/A', 'dining table',
-    'N/A', 'N/A', 'toilet', 'N/A', 'tv', 'laptop', 'mouse', 'remote', 'keyboard',
-    'cell phone', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'N/A', 'book',
-    'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush'
-]
+#COCO_INSTANCE_CATEGORY_NAMES = [
+#    '__background__', 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
+#    'train', 'truck', 'boat', 'traffic light', 'fire hydrant', 'N/A', 'stop sign',
+#    'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
+#    'elephant', 'bear', 'zebra', 'giraffe', 'N/A', 'backpack', 'umbrella', 'N/A',
+#    'N/A', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball',
+#    'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
+#    'bottle', 'N/A', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
+#    'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza',
+#    'donut', 'cake', 'chair', 'couch', 'potted plant', 'bed', 'N/A', 'dining table',
+#    'N/A', 'N/A', 'toilet', 'N/A', 'tv', 'laptop', 'mouse', 'remote', 'keyboard',
+#    'cell phone', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'N/A', 'book',
+#    'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush'
+#]
 
 # Function to preprocess image
 def preprocess(image):
-    return F.to_tensor(image).unsqueeze(0)
+    preprocess = weights.transforms()
+    return preprocess(image).unsqueeze(0)  # Add batch dimension
+    #return F.to_tensor(image).unsqueeze(0)
 
 # Function to postprocess results
 def postprocess(output, threshold=0.3):
@@ -48,25 +53,32 @@ def postprocess(output, threshold=0.3):
     scores = output[0]['scores']
     
     detected_objects = []
+    other_objects = []
     current_time = datetime.datetime.now().isoformat()
 
     for box, label, score in zip(boxes, labels, scores):
         if score >= threshold:
-            label_name = COCO_INSTANCE_CATEGORY_NAMES[label.item()]
+            label_name = weights.meta["categories"][label.item()]
+            is_hit = False
             for group_name, group_items in groups.items():
+                
                 if label_name in group_items:  # Check if the label belongs to any group
                     detected_objects.append({
-                        #"box": box.tolist(),
+                        "box": box.tolist(),
+                        "timestamp": current_time,
+                        "label": label_name,
+                        "score": score.item()
+                    })
+                    is_hit = True
+            if not is_hit:
+                    other_objects.append({
+                        "box": box.tolist(),
                         "timestamp": current_time,
                         "label": label_name,
                         "score": score.item()
                     })
                    
-
-    return detected_objects
-
-
-
+    return detected_objects, other_objects
 
 # Main function for testing with a local jpg file
 def main():
@@ -82,13 +94,15 @@ def main():
         outputs = model(input_tensor)
 
     # Postprocess the outputs
-    detections = postprocess(outputs)
+    detections, others = postprocess(outputs)
 
     # Convert detections to JSON
     detections_json = json.dumps(detections, indent=4)
+    others_json = json.dumps(others, indent=4)
 
     # Print the JSON output
     print(detections_json)
+    print(others_json)
 
 if __name__ == "__main__":
     main()

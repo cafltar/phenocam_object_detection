@@ -1,4 +1,3 @@
-import os
 import sys
 import torch
 from PIL import Image
@@ -7,11 +6,13 @@ from torchvision.transforms import functional as F
 import requests
 from io import BytesIO
 import json
-import time
 import datetime
+from torchvision import transforms
+from torchvision.models.detection import FasterRCNN_ResNet50_FPN_Weights
 
 # Define model
-model = fasterrcnn_resnet50_fpn(pretrained=True)
+weights = FasterRCNN_ResNet50_FPN_Weights.DEFAULT
+model = fasterrcnn_resnet50_fpn(weights=weights)
 model.eval()  # Set the model to evaluation mode
 
 groups = {
@@ -39,7 +40,9 @@ COCO_INSTANCE_CATEGORY_NAMES = [
 
 # Function to preprocess image
 def preprocess(image):
-    return F.to_tensor(image).unsqueeze(0)
+    preprocess = weights.transforms()
+    return preprocess(image).unsqueeze(0)  # Add batch dimension
+    #return F.to_tensor(image).unsqueeze(0)
 
 # Function to postprocess results
 def postprocess(output, threshold=0.3):
@@ -104,7 +107,7 @@ if __name__ == "__main__":
     print('Running v0.1.1')
 
     if len(sys.argv) < 2:
-        print("Usage: python detect_objects.py image_url [score_threshold]")
+        print("Usage: python main.py image_url [score_threshold]")
         sys.exit(1)
     
     image_url = sys.argv[1]
