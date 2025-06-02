@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM python:3.12-slim
 
 # Set the working directory in the container
 WORKDIR /app
@@ -7,7 +7,8 @@ WORKDIR /app
 COPY . /app
 
 # Install any needed packages 
-RUN pip install --no-cache-dir -r app/requirements.txt
+#RUN pip install --no-cache-dir -r app/requirements.txt
+RUN pip install -r app/requirements.txt
 
 # Use a non-root user for security
 RUN useradd -m appuser && chown -R appuser /app
@@ -20,4 +21,4 @@ EXPOSE 80
 ENV NAME World
 
 # Run detect_objects.py when the container launches
-ENTRYPOINT ["python", "main.py"]
+ENTRYPOINT ["python", "app/main.py"]
